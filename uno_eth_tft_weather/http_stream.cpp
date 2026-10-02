@@ -6,6 +6,10 @@
 static EthernetClient client;
 static byte mac[] = { NET_MAC };
 static IPAddress ip(NET_IP);
+static char responseBuf[WHOLE_HTTP_LIMIT];
+static size_t responseLen = 0;
+static size_t responsePos = 0;
+static bool responseBuffered = false;
 
 void netBegin() {
   Ethernet.begin(mac, ip);
@@ -46,14 +50,47 @@ void httpEnd(PGM_P host) {
 }
 
 void httpClose() {
+  responseBuffered = false;
+  responseLen = 0;
+  responsePos = 0;
   client.stop();
 }
 
+bool httpBufferResponse() {
+  responsePos = 0;
+  responseLen = 0;
+  responseBuffered = false;
+
+  unsigned long t = millis();
+  while ((client.connected() || client.available()) && millis() - t < 8000UL) {
+    while (client.available()) {
+      int ch = client.read();
+      if (ch < 0) break;
+      if (responseLen < sizeof(responseBuf) - 1) {
+        responseBuf[responseLen++] = (char)ch;
+      } else {
+        responseBuf[sizeof(responseBuf) - 1] = 0;
+        responseBuffered = true;
+        return true;
+      }
+    }
+    if (!client.connected() && !client.available()) break;
+  }
+
+  responseBuf[responseLen] = 0;
+  responseBuffered = responseLen > 0;
+  return responseBuffered;
+}
 
 // ---------------- stream reading ----------------
 
 // one byte from the socket, -1 on timeout / closed
 static int readCh() {
+  if (responseBuffered) {
+    if (responsePos >= responseLen) return -1;
+    return (unsigned char)responseBuf[responsePos++];
+  }
+
   unsigned long t = millis();
   while (millis() - t < 8000UL) {
     if (client.available()) return client.read();

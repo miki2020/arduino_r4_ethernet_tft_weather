@@ -19,6 +19,8 @@ bool weatherFetch(const Location &l, Weather &w) {
   Serial.print(F("[WEATHER] Requesting ")); Serial.print(l.name);
   Serial.print(F(" at ")); Serial.print(l.lat);
   Serial.print(','); Serial.println(l.lon);
+  Serial.print(F("[WEATHER] Coordinates: ")); Serial.print(l.lat);
+  Serial.print(F(" / ")); Serial.println(l.lon);
 
   if (!httpOpen(HOST)) return false;
 
@@ -29,6 +31,7 @@ bool weatherFetch(const Location &l, Weather &w) {
   httpSendP(PSTR("&current=temperature_2m,relative_humidity_2m,is_day,precipitation,"
                  "cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m"));
   httpEnd(HOST);
+  httpBufferResponse();
 
   // skip "current_units", then read the values in the order they arrive
   const char *failedField = 0;

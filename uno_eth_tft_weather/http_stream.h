@@ -10,6 +10,7 @@ bool httpOpen(PGM_P host);                         // connect to host:80 (host i
 void httpSendP(PGM_P text);                        // send text stored in flash
 void httpSend(const char *text);                   // send text stored in RAM
 void httpEnd(PGM_P host);                          // finish the request line + headers
+bool httpBufferResponse();                         // read the HTTP reply into RAM once, for R4-sized buffers
 void httpClose();
 
 bool streamSeek(PGM_P key);                        // consume stream up to and including key

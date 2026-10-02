@@ -10,5 +10,6 @@ extern Adafruit_ST7789 tft;
 
 void displayInit();
 void displayMessage(const __FlashStringHelper *a, const __FlashStringHelper *b);
-void displayWeather(const Weather &w, const Location &l);   // full scene picture + values
+void displayWeather(const Weather &w, const Location &l, bool showData = true); // scene + optional data overlay
 void displayStale();                                        // small red mark: data is old
+void displayStatusBadge(bool networkOnline, byte current, byte total);

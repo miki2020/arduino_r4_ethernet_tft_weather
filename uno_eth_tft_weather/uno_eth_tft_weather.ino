@@ -12,21 +12,21 @@
 #include "sd_image.h"
 #include "display.h"
 
-Location locations[2];
-Weather weather[2];
-bool haveData[2] = { false, false };
-bool fetchFailed[2] = { false, false };
+Weather weather[MAX_LOCATIONS];
+bool haveData[MAX_LOCATIONS] = { false };
+bool fetchFailed[MAX_LOCATIONS] = { false };
 unsigned long lastFetch = 0;
-byte displayedLocation = 0;
+byte displayScreen = 0;
 
-// Keep the EEPROM/Serial-configured location in slot 2.
 static void waitFor(unsigned long ms) {
   unsigned long t = millis();
   while (millis() - t < ms) {
     if (locationPoll()) {
-      locations[1] = loc;
-      haveData[1] = false;
-      fetchFailed[1] = false;
+      displayScreen = 0;
+      for (byte i = 0; i < locationCount; i++) {
+        haveData[i] = false;
+        fetchFailed[i] = false;
+      }
       lastFetch = 0;
       return;
     }
@@ -34,7 +34,7 @@ static void waitFor(unsigned long ms) {
 }
 
 static void fetchWeather() {
-  for (byte i = 0; i < 2; i++) {
+  for (byte i = 0; i < locationCount; i++) {
     if (weatherFetch(locations[i], weather[i])) {
       haveData[i] = true;
       fetchFailed[i] = false;
@@ -53,12 +53,6 @@ void setup() {
 
   Serial.begin(9600);
   Serial.println(F("[BOOT] UNO Ethernet TFT weather starting"));
-  locationLoad();
-  strcpy_P(locations[0].lat, PSTR("51.7592"));
-  strcpy_P(locations[0].lon, PSTR("19.4560"));
-  strcpy_P(locations[0].name, PSTR("Lodz"));
-  locations[0].magic = LOC_MAGIC;
-  locations[1] = loc;
 
   // keep every SPI device deselected before starting anything
   pinMode(TFT_CS, OUTPUT); digitalWrite(TFT_CS, HIGH);
@@ -67,8 +61,10 @@ void setup() {
 
   Serial.println(F("[BOOT] Initializing display"));
   displayInit();
+  displayMessage(F("BOOT"), F("INITIALIZING"));
   Serial.println(F("[BOOT] Display ready"));
 
+  locationLoad();
 
   netBegin();
   delay(1000);
@@ -76,25 +72,46 @@ void setup() {
   Serial.println(F("[SD] Initializing card"));
   if (!sdBegin()) {
     Serial.println(F("[SD] Initialization failed; check card, wiring, and format"));
+    displayMessage(F("SD"), F("ERROR"));
     while (true) {}
   }
   Serial.println(F("[SD] Ready"));
+
+  displayMessage(F("READY"), F("LOADING DATA"));
+  delay(1200);
 
   locationHelp();
 }
 
 void loop() {
 
-  unsigned long refreshInterval = fetchFailed[0] || fetchFailed[1] ? RETRY_MS : REFRESH_MS;
+  if (locationCount == 0) {
+    displayMessage(F("NO DATA"), F("ADD LOCATION"));
+    waitFor(LOCATION_SWITCH_MS);
+    return;
+  }
+
+  unsigned long refreshInterval = fetchFailed[displayedLocation] ? RETRY_MS : REFRESH_MS;
   if (!lastFetch || millis() - lastFetch >= refreshInterval) fetchWeather();
 
   if (haveData[displayedLocation]) {
-    displayWeather(weather[displayedLocation], locations[displayedLocation]);
-    if (fetchFailed[displayedLocation]) displayStale();
+    displayWeather(weather[displayedLocation], locations[displayedLocation], displayScreen == 0);
+    if (displayScreen == 0 && fetchFailed[displayedLocation]) displayStale();
   } else {
-    displayMessage(F("NO DATA"), F("RETRYING.."));
+    if (displayScreen == 0) displayMessage(F("NO DATA"), F("RETRYING.."));
+    else {
+      char scene[12];
+      strcpy_P(scene, PSTR("CLRDAY.BIN"));
+      drawImage(scene, 0, 0, 280, 240);
+    }
   }
 
+  displayStatusBadge(Ethernet.linkStatus() == LinkON, displayedLocation + 1, locationCount);
+
   waitFor(LOCATION_SWITCH_MS);
-  displayedLocation = (displayedLocation + 1) % 2;
+  if (displayScreen == 0) displayScreen = 1;
+  else {
+    displayScreen = 0;
+    if (locationCount > 1) displayedLocation = (displayedLocation + 1) % locationCount;
+  }
 }

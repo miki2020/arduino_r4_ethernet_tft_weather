@@ -32,6 +32,26 @@ bool drawImage(const char *name, int16_t x, int16_t y, uint16_t w, uint16_t h) {
 
   if (!file.open(root, name, O_READ)) return false;
 
+  uint32_t size = file.fileSize();
+  if (size > 0 && size <= WHOLE_FILE_LIMIT) {
+    uint16_t *img = (uint16_t *)malloc(size);
+    if (img) {
+      if (file.read((uint8_t *)img, size) == (int)size) {
+        for (uint32_t i = 0; i < size / 2; i++) {
+          img[i] = (img[i] << 8) | (img[i] >> 8);
+        }
+        for (uint16_t row = 0; row < h; row++) {
+          tft.drawRGBBitmap(x, y + row, img + (row * w), w, 1);
+        }
+        free(img);
+        file.close();
+        return true;
+      }
+      free(img);
+    }
+  }
+
+  file.seekSet(0);
   for (uint16_t row = 0; row < h; row++) {
     for (uint16_t col = 0; col < w; col += CHUNK) {
 

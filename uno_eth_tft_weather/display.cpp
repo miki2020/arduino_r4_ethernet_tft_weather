@@ -31,6 +31,24 @@ void displayStale() {
   tft.fillRect(268, 4, 8, 8, ST77XX_RED);
 }
 
+void displayStatusBadge(bool networkOnline, byte current, byte total) {
+  uint16_t netColor = networkOnline ? ST77XX_GREEN : ST77XX_RED;
+  tft.fillRoundRect(18, 16, 26, 18, 5, netColor);
+  tft.drawRoundRect(17, 15, 28, 20, 5, ST77XX_WHITE);
+
+  char number[8];
+  itoa(current, number, 10);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextSize(2);
+  tft.setCursor(52, 18);
+  tft.print('#');
+  tft.print(number);
+  if (total > 1) {
+    tft.print('/');
+    tft.print(total);
+  }
+}
+
 // text with a black outline (readable on any background)
 static void outlined(int16_t x, int16_t y, uint8_t size, const char *s) {
   tft.setTextSize(size);
@@ -50,9 +68,10 @@ static bool nonZero(const char *s) {
   return false;
 }
 
-void displayWeather(const Weather &w, const Location &l) {
+void displayWeather(const Weather &w, const Location &l, bool showData) {
 
-  // temperature rounded to a whole number, from the text
+  // keep the numeric temperature for scene selection, but render the raw API value
+  // so decimal precision remains visible on the display.
   int t = atoi(w.temp);
   const char *dot = strchr(w.temp, '.');
   if (dot && dot[1] >= '5') t += (w.temp[0] == '-') ? -1 : 1;
@@ -73,42 +92,54 @@ void displayWeather(const Weather &w, const Location &l) {
   else if (rain)  i = 6;
   else            i = (overcast ? 4 : partly ? 2 : 0) + (isDay ? 0 : 1);
 
-  char name[12];
-  strcpy_P(name, SCENES[i]);
-  if (!drawImage(name, 0, 0, 280, 240)) tft.fillScreen(ST77XX_BLACK);
+  if (showData) {
+    tft.fillScreen(ST77XX_BLACK);
+  } else {
+    char name[12];
+    strcpy_P(name, SCENES[i]);
+    if (!drawImage(name, 0, 0, 280, 240)) tft.fillScreen(ST77XX_BLACK);
 
-  // ---- right column: temperature, place name, coordinates ----
+    char place[22];
+    strncpy(place, l.name, sizeof(place) - 1);
+    place[sizeof(place) - 1] = 0;
+    tft.setTextColor(ST77XX_WHITE);
+    tft.setTextSize(2);
+    tft.setCursor(18, 205);
+    tft.print(place);
+  }
+
+  if (!showData) return;
+
   char line[32];
-  char num[8];
+  char tempText[8];
 
-  itoa(t, num, 10);
-  uint8_t ts = (strlen(num) > 2) ? 4 : 5;       // "-12" does not fit at size 5
-  outlined(158, 20, ts, num);
+  strncpy(tempText, w.temp, sizeof(tempText) - 1);
+  tempText[sizeof(tempText) - 1] = 0;
+  uint8_t ts = (strlen(tempText) > 4) ? 6 : 7;
+  outlined(100, 18, ts, tempText);
 
-  outlined(158, 74, (strlen(l.name) > 10) ? 1 : 2, l.name);   // long names: small font
+  outlined(12, 82, (strlen(l.name) > 10) ? 1 : 2, l.name);
+  outlined(12, 108, 2, l.lat);
+  outlined(12, 132, 2, l.lon);
 
-  outlined(158, 96, 2, l.lat);                  // coordinates, e.g. 52.5243 / 13.4105
-  outlined(158, 116, 2, l.lon);
-
-  // ---- detail rows (bottom), built without printf ----
   strcpy_P(line, PSTR("HUM "));
   strcat(line, w.hum);
   strcat_P(line, PSTR("%  CLOUD "));
   strcat(line, w.cloud);
   strcat_P(line, PSTR("%"));
-  outlined(8, 172, 2, line);
+  outlined(12, 172, 2, line);
 
   strcpy_P(line, PSTR("WIND "));
   strcat(line, w.wind);
   strcat_P(line, PSTR(" km/h "));
   strcat_P(line, DIRS[((atoi(w.wdir) + 22) / 45) & 7]);
-  outlined(8, 196, 2, line);
+  outlined(12, 196, 2, line);
 
-  strcpy(line, w.press);                        // whole hPa
+  strcpy(line, w.press);
   char *p = strchr(line, '.');
   if (p) *p = 0;
   strcat_P(line, PSTR(" hPa  RAIN "));
   strcat(line, w.rain);
   strcat_P(line, PSTR(" mm"));
-  outlined(8, 220, 2, line);
+  outlined(12, 220, 2, line);
 }

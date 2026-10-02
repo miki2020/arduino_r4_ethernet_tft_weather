@@ -3,6 +3,7 @@
 // ==================================================
 #pragma once
 #include <Arduino.h>
+#include "config.h"
 
 #define LOC_MAGIC 0xA5
 
@@ -14,7 +15,11 @@ struct Location {
 };
 
 extern Location loc;
+extern Location locations[MAX_LOCATIONS];
+extern byte locationCount;
+extern byte displayedLocation;
 
 void locationLoad();       // from EEPROM (or the defaults from config.h)
 bool locationPoll();       // read Serial; true when a new location was just applied
 void locationHelp();       // print usage
+bool locationDeleteByNumber(byte number);

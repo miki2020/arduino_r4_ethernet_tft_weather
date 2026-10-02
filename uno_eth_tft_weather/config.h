@@ -21,6 +21,9 @@
 #define REFRESH_MS  600000UL   // weather refresh: 10 min (Open-Meteo updates every 15 min)
 #define RETRY_MS     30000UL   // retry after a failed update
 #define LOCATION_SWITCH_MS 6000UL
+#define MAX_LOCATIONS 32
+#define WHOLE_FILE_LIMIT 16384UL
+#define WHOLE_HTTP_LIMIT 2048U
 
 // ---- location used until you send a new one over Serial ----
 #define DEFAULT_LAT   "51.4055"
